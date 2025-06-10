@@ -474,7 +474,7 @@ class MLIPTrainEvalUnit(TrainUnit[AtomicData], EvalUnit[AtomicData], Stateful):
         # placeholder for autocast code, may need to move out to common
         self.bf16 = bf16
         self.autocast_enabled = self.bf16
-        self.autocast_dtype = torch.bfloat16
+        self.autocast_dtype = torch.float16
 
         self.finetune_model_full_config = getattr(
             model, "finetune_model_full_config", None
@@ -844,7 +844,7 @@ class MLIPEvalUnit(EvalUnit[AtomicData]):
 
         # TODO see placeholder comment in TrainEvalUnit as well
         self.autocast_enabled = bf16
-        self.autocast_dtype = torch.bfloat16
+        self.autocast_dtype = torch.float16
 
     def setup_train_eval_unit(self, model: torch.nn.Module) -> None:
         self.model = model
