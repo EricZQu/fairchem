@@ -28,11 +28,11 @@ class MolecularGraphConfigs:
     max_batch_size: int
     max_radius: float
     knn_k: int
-    knn_soft: bool
-    knn_sigmoid_scale: float
-    knn_lse_scale: float
-    knn_use_low_mem: bool
-    knn_pad_size: int
+    knn_pad_size: int = 30
+    knn_soft: bool = True
+    knn_sigmoid_scale: float = 0.2
+    knn_lse_scale: float = 0.1
+    knn_use_low_mem: bool = True
     distance_function: Literal["gaussian", "sigmoid", "linearsigmoid", "silu"] = (
         "gaussian"
     )

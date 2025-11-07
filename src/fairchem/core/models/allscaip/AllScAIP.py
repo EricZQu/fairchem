@@ -18,6 +18,7 @@ from fairchem.core.models.allscaip.utils.data_preprocess import (
     data_preprocess_radius_graph,
     unpad_results,
 )
+from fairchem.core.models.allscaip.utils.nn_utils import get_feedforward
 from fairchem.core.models.base import BackboneInterface, HeadInterface
 from fairchem.core.models.escaip.utils.graph_utils import (
     compilable_scatter,
@@ -25,7 +26,6 @@ from fairchem.core.models.escaip.utils.graph_utils import (
 )
 from fairchem.core.models.escaip.utils.nn_utils import (
     NormalizationType,
-    get_feedforward,
     get_normalization_layer,
     init_linear_weights,
     no_weight_decay,
