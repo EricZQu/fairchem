@@ -19,9 +19,11 @@ from fairchem.core.models.allscaip.modules.neighborhood_attention import (
 )
 from fairchem.core.models.allscaip.modules.node_attention import NodeAttention
 from fairchem.core.models.allscaip.utils.nn_utils import (
+    get_feedforward,
+)
+from fairchem.core.models.escaip.utils.nn_utils import (
     Activation,
     NormalizationType,
-    get_feedforward,
     get_normalization_layer,
 )
 

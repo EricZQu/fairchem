@@ -16,20 +16,20 @@ from fairchem.core.models.allscaip.modules.graph_attention_block import (
 from fairchem.core.models.allscaip.modules.input_block import InputBlock
 from fairchem.core.models.allscaip.utils.data_preprocess import (
     data_preprocess_radius_graph,
-)
-from fairchem.core.models.allscaip.utils.graph_utils import (
-    compilable_scatter,
-    get_displacement_and_cell,
     unpad_results,
 )
-from fairchem.core.models.allscaip.utils.nn_utils import (
+from fairchem.core.models.base import BackboneInterface, HeadInterface
+from fairchem.core.models.escaip.utils.graph_utils import (
+    compilable_scatter,
+    get_displacement_and_cell,
+)
+from fairchem.core.models.escaip.utils.nn_utils import (
     NormalizationType,
     get_feedforward,
     get_normalization_layer,
     init_linear_weights,
     no_weight_decay,
 )
-from fairchem.core.models.base import BackboneInterface, HeadInterface
 
 if TYPE_CHECKING:
     from fairchem.core.datasets.atomic_data import AtomicData

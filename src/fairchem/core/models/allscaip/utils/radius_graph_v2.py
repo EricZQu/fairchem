@@ -13,66 +13,11 @@ import torch
 if TYPE_CHECKING:
     from fairchem.core.datasets.atomic_data import AtomicData
 
-
-def safe_norm(
-    x: torch.Tensor,
-    dim: int = -1,
-    keepdim: bool = False,
-    eps: float = 1e-12,
-) -> torch.Tensor:
-    """
-    Computes the norm of a tensor with a small epsilon to avoid division by zero.
-    Args:
-        x: The input tensor.
-        dim: The dimension to reduce.
-        keepdim: Whether to keep the reduced dimension.
-        eps: The epsilon value.
-    Returns:
-        The norm of the input tensor.
-    """
-    vec_norm_sq = x.square().sum(dim=dim, keepdim=keepdim)
-    vec_norm = vec_norm_sq.clamp_min(eps).sqrt()
-    vec_norm = torch.where(vec_norm_sq <= eps, torch.zeros_like(vec_norm), vec_norm)
-    return vec_norm
-
-
-def safe_normalize(
-    x: torch.Tensor,
-    dim: int = -1,
-    eps: float = 1e-12,
-) -> torch.Tensor:
-    """
-    Computes the normalized vector with a small epsilon to avoid division by zero.
-    Args:
-        x: The input tensor.
-        dim: The dimension to reduce.
-        eps: The epsilon value.
-    Returns:
-        The L2 normalized tensor.
-    """
-    vec_norm_sq = x.square().sum(dim=dim, keepdim=True)
-    vec_norm = vec_norm_sq.clamp_min(eps).sqrt()
-    norm_vec = torch.where(vec_norm_sq <= eps, torch.zeros_like(x), x / vec_norm)
-    return norm_vec
-
-
-def envelope_fn(
-    x: torch.Tensor,
-    envelope: bool = True,
-) -> torch.Tensor:
-    """
-    Computes the envelope function in log space that smoothly vanishes to -inf at x = 1.
-    Args:
-        x: The input tensor.
-        envelope: Whether to use the envelope function. Default: True
-    Returns:
-        The envelope function in log space.
-    """
-    if envelope:
-        env = -x.pow(2) / (1 - x.pow(2))
-    else:
-        env = torch.zeros_like(x)
-    return torch.where(x < 1, env, -torch.inf)
+from fairchem.core.models.escaip.utils.radius_graph import (
+    hard_rank,
+    safe_norm,
+    soft_rank,
+)
 
 
 def bump_function(x: torch.Tensor) -> torch.Tensor:
@@ -92,40 +37,6 @@ def bump_function(x: torch.Tensor) -> torch.Tensor:
         torch.exp(-2.0 / (x + 1)) + torch.exp(-2.0 / (1 - x))
     )
     return torch.where(mask, bump, step)
-
-
-def soft_rank(
-    dist: torch.Tensor,
-    scale: float,
-) -> torch.Tensor:
-    """
-    calculate the soft rankings for the soft knn
-    Args:
-        dist: the pairwise distance tensor
-        scale: the scale factor for the sigmoid function (Å).
-    Returns:
-        ranks: the soft rankings
-    """
-    ranks = torch.sigmoid((dist[:, :, None] - dist[:, None, :]) / scale).sum(dim=-1)
-    return ranks
-
-
-def hard_rank(
-    dist: torch.Tensor,
-) -> torch.Tensor:
-    """
-    calculate the hard rankings for the hard knn
-    Args:
-        dist: the pairwise distance tensor
-    Returns:
-        ranks: the hard rankings
-    """
-    ranks = torch.empty_like(dist)
-    ranks[
-        torch.arange(dist.size(0), device=dist.device)[:, None],
-        torch.argsort(dist, dim=-1),
-    ] = torch.arange(dist.size(-1), device=dist.device, dtype=dist.dtype)
-    return ranks
 
 
 def soft_rank_low_mem(

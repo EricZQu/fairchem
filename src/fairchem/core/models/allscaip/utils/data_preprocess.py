@@ -5,6 +5,7 @@ import math
 from typing import TYPE_CHECKING
 
 import torch
+import torch.nn.functional as F
 from e3nn.o3._spherical_harmonics import _spherical_harmonics
 
 if TYPE_CHECKING:
@@ -16,17 +17,16 @@ if TYPE_CHECKING:
     )
 
 from fairchem.core.models.allscaip.custom_types import GraphAttentionData
-from fairchem.core.models.allscaip.utils.graph_utils import (
-    compilable_scatter,
-    pad_batch,
-)
 from fairchem.core.models.allscaip.utils.radius_graph_v2 import (
     biknn_radius_graph,
+)
+from fairchem.core.models.escaip.utils.graph_utils import compilable_scatter
+from fairchem.core.models.escaip.utils.radius_graph import (
     envelope_fn,
     safe_norm,
     safe_normalize,
 )
-from fairchem.core.models.allscaip.utils.smearing import (
+from fairchem.core.models.escaip.utils.smearing import (
     GaussianSmearing,
     LinearSigmoidSmearing,
     SigmoidSmearing,
@@ -414,3 +414,103 @@ def data_preprocess_radius_graph(
         num_nodes=num_nodes,
     )
     return x
+
+
+def pad_batch(
+    max_atoms,
+    max_batch_size,
+    atomic_numbers,
+    charge,
+    spin,
+    edge_direction,
+    edge_distance,
+    neighbor_index,
+    node_batch,
+    num_graphs,
+    src_mask,
+    dst_mask,
+    src_index,
+    dst_index,
+    dist_pairwise,
+):
+    """
+    Pad the batch to have the same number of nodes in total.
+    Needed for torch.compile
+
+    Note: the sampler for multi-node training could sample batchs with different number of graphs.
+    The number of sampled graphs could be smaller or larger than the batch size.
+    This would cause the model to recompile or core dump.
+    Temporarily, setting the max number of graphs to be twice the batch size to mitigate this issue.
+    TODO: look into a better way to handle this.
+    """
+    device = atomic_numbers.device
+    _, num_nodes, _ = neighbor_index.shape
+    pad_size = max_atoms - num_nodes
+    assert (
+        pad_size >= 0
+    ), "Number of nodes exceeds the maximum number of nodes per batch"
+    assert (
+        max_batch_size >= num_graphs
+    ), "Number of graphs exceeds the maximum batch size"
+
+    # pad the features
+    atomic_numbers = F.pad(atomic_numbers, (0, pad_size), value=0)
+    edge_direction = F.pad(edge_direction, (0, 0, 0, 0, 0, pad_size), value=0)
+    edge_distance = F.pad(edge_distance, (0, 0, 0, pad_size), value=0)
+    neighbor_index = F.pad(neighbor_index, (0, 0, 0, pad_size), value=-1)
+    node_batch = F.pad(node_batch, (0, pad_size), value=-1)
+    src_mask = F.pad(src_mask, (0, 0, 0, pad_size), value=-torch.inf)
+    dst_mask = F.pad(dst_mask, (0, 0, 0, pad_size), value=-torch.inf)
+    src_index = F.pad(src_index, (0, 0, 0, pad_size), value=-1)
+    dst_index = F.pad(dst_index, (0, 0, 0, pad_size), value=-1)
+    dist_pairwise = F.pad(dist_pairwise, (0, pad_size, 0, pad_size), value=0)
+    if charge is not None:
+        charge = F.pad(charge, (0, max_batch_size - num_graphs), value=0)
+    else:
+        charge = torch.zeros(max_batch_size, dtype=torch.float, device=device)
+    if spin is not None:
+        spin = F.pad(spin, (0, max_batch_size - num_graphs), value=0)
+    else:
+        spin = torch.zeros(max_batch_size, dtype=torch.float, device=device)
+
+    return (
+        atomic_numbers,
+        charge,
+        spin,
+        edge_direction,
+        edge_distance,
+        neighbor_index,
+        src_mask,
+        dst_mask,
+        src_index,
+        dst_index,
+        dist_pairwise,
+        node_batch,
+    )
+
+
+def unpad_results(results: dict, data: GraphAttentionData):
+    """
+    Unpad the results to remove the padding.
+    """
+    unpad_results = {}
+    for key in results:
+        if results[key].shape[0] == data.max_num_nodes:
+            # Node-level results
+            unpad_results[key] = results[key][: data.num_nodes]
+        elif results[key].shape[0] == data.max_batch_size:
+            # Graph-level results
+            unpad_results[key] = results[key][: data.num_graphs]
+        elif (
+            results[key].shape[0] == data.num_nodes
+            or results[key].shape[0] == data.num_graphs
+        ):
+            # Results already unpadded
+            unpad_results[key] = results[key]
+        else:
+            raise ValueError(
+                f"Unknown padding mask shape for key '{key}': "
+                f"result shape {results[key].shape}, "
+                f"data shape {data.num_nodes}, {data.num_graphs}"
+            )
+    return unpad_results
